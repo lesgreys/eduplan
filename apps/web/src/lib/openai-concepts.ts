@@ -154,7 +154,7 @@ export function generateMockConcepts(
 ): ActivityConcept[] {
   const concepts: ActivityConcept[] = []
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  const timeSlots = ['09:00', '10:30', '13:00', '14:30']
+  const timeSlots = ['09:00', '10:30', '13:00', '14:30', '16:00', '17:30']
   
   const activityIdeas = [
     { title: 'Nature Math Hunt', subject: 'Math', summary: 'Find and count patterns in nature while learning multiplication' },
