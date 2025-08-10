@@ -29,13 +29,17 @@ function DraggableActivity({
   child, 
   onClick,
   onStatusChange,
-  onCopy
+  onCopy,
+  showDuration = false,
+  slotSpan = 1
 }: { 
   activity: Activity
   child: Child
   onClick: () => void
   onStatusChange?: (id: string, status: 'completed' | 'skipped' | 'pending') => void
   onCopy?: (activity: Activity) => void
+  showDuration?: boolean
+  slotSpan?: number
 }) {
   const [showActions, setShowActions] = useState(false)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -68,8 +72,11 @@ function DraggableActivity({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`rounded border ${getChildColor(child.color)} ${getStatusStyles()} h-full flex items-center group text-xs relative`}
+      style={{
+        ...style,
+        minHeight: slotSpan > 1 ? `${slotSpan * 32}px` : '40px'
+      }}
+      className={`rounded border ${getChildColor(child.color)} ${getStatusStyles()} flex items-center group text-xs relative ${slotSpan > 1 ? 'border-2' : ''}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
@@ -105,7 +112,14 @@ function DraggableActivity({
                 <Sparkles className="w-2.5 h-2.5 text-yellow-600 flex-shrink-0" />
               )}
             </div>
-            <p className="opacity-75 truncate" style={{ fontSize: '10px' }}>{activity.subject}</p>
+            <div className="flex items-center gap-1">
+              <p className="opacity-75 truncate" style={{ fontSize: '10px' }}>{activity.subject}</p>
+              {showDuration && activity.endTime && (
+                <p className="opacity-60" style={{ fontSize: '9px' }}>
+                  {activity.startTime}-{activity.endTime}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -161,7 +175,8 @@ function DroppableSlot({
   onEmptyClick,
   onStatusChange,
   onCopy,
-  isWeekend = false
+  isWeekend = false,
+  timeSlots
 }: { 
   day: string
   time: string
@@ -172,6 +187,7 @@ function DroppableSlot({
   onStatusChange?: (id: string, status: 'completed' | 'skipped' | 'pending') => void
   onCopy?: (activity: Activity) => void
   isWeekend?: boolean
+  timeSlots?: string[]
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${day}-${time}`,
@@ -180,17 +196,41 @@ function DroppableSlot({
 
   const getChild = (childId: string) => children.find(c => c.id === childId)
   
+  // Helper to calculate activity duration in 30-minute slots
+  const getActivitySlotSpan = (activity: Activity): number => {
+    if (!activity.endTime || !timeSlots) return 1
+    
+    const startMinutes = timeToMinutes(activity.startTime)
+    const endMinutes = timeToMinutes(activity.endTime)
+    const durationMinutes = endMinutes - startMinutes
+    
+    // Each slot is 30 minutes
+    return Math.max(1, Math.ceil(durationMinutes / 30))
+  }
+  
+  const timeToMinutes = (timeStr: string): number => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    return hours * 60 + minutes
+  }
+  
+  // Only show activities that start in this time slot
+  const startingActivities = activities.filter(a => a.startTime === time)
+  
   return (
     <div
       ref={setNodeRef}
       className={`relative border-r last:border-r-0 group ${
         isOver ? 'bg-primary/10' : isWeekend ? 'bg-muted/10' : 'hover:bg-muted/5'
       }`}
+      style={{ minHeight: '64px' }}
     >
       <div className="p-1 h-full">
         <div className="flex flex-col gap-1">
-          {activities.map(activity => {
+          {/* Render activities that start in this slot */}
+          {startingActivities.map(activity => {
             const child = getChild(activity.childId)
+            const slotSpan = getActivitySlotSpan(activity)
+            
             return child ? (
               <div key={activity.id} className="min-h-[40px]">
                 <DraggableActivity 
@@ -199,18 +239,21 @@ function DroppableSlot({
                   onClick={() => onActivityClick(activity)}
                   onStatusChange={onStatusChange}
                   onCopy={onCopy}
+                  showDuration={slotSpan > 1}
+                  slotSpan={slotSpan}
                 />
               </div>
             ) : null
           })}
-          {/* Always show add button, even when there are activities */}
+          
+          {/* Always show add button */}
           <button
             onClick={(e) => {
               e.stopPropagation()
               onEmptyClick()
             }}
             className={`w-full py-2 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
-              activities.length === 0 ? 'min-h-[40px]' : 'opacity-0 group-hover:opacity-100'
+              startingActivities.length === 0 ? 'min-h-[40px]' : 'opacity-0 group-hover:opacity-100'
             }`}
           >
             <Plus className="w-3 h-3 text-muted-foreground" />
@@ -537,10 +580,24 @@ export default function Dashboard() {
 
   // Get activities for a specific day and time (filtered by view)
   const getActivitiesForSlot = (day: string, time: string) => {
-    const slotActivities = filteredActivities.filter(a => 
-      a.day === day && a.startTime === time
-    )
+    const slotActivities = filteredActivities.filter(a => {
+      if (a.day !== day) return false
+      
+      // Check if activity spans this time slot
+      const activityStartMinutes = timeToMinutes(a.startTime)
+      const activityEndMinutes = timeToMinutes(a.endTime || a.startTime)
+      const slotMinutes = timeToMinutes(time)
+      
+      // Activity spans this slot if it starts at or before this time and ends after it
+      return activityStartMinutes <= slotMinutes && activityEndMinutes > slotMinutes
+    })
     return slotActivities
+  }
+  
+  // Convert time string to minutes for comparison
+  const timeToMinutes = (timeStr: string): number => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    return hours * 60 + minutes
   }
 
   // Calculate ISO week number
@@ -1345,7 +1402,10 @@ export default function Dashboard() {
                   {timeSlots.map(time => {
                     // Calculate max activities for this time slot across all days
                     const maxActivities = Math.max(
-                      ...weekDays.map(day => getActivitiesForSlot(day, time).length),
+                      ...weekDays.map(day => {
+                        const slotActivities = getActivitiesForSlot(day, time)
+                        return slotActivities.filter(a => a.startTime === time).length
+                      }),
                       1
                     )
                     const rowHeight = maxActivities > 1 ? Math.max(64, maxActivities * 48) : 64
@@ -1376,6 +1436,7 @@ export default function Dashboard() {
                               onEmptyClick={() => openActivityModal(null, day, time)}
                               onStatusChange={updateActivityStatus}
                               onCopy={copyActivity}
+                              timeSlots={timeSlots}
                             />
                           )
                         })}
@@ -1428,6 +1489,7 @@ export default function Dashboard() {
                               onEmptyClick={() => openActivityModal(null, todayName, time)}
                               onStatusChange={updateActivityStatus}
                               onCopy={copyActivity}
+                              timeSlots={timeSlots}
                             />
                           </div>
                         </div>
