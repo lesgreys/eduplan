@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getChildren, getActivities, createActivity, updateActivity, deleteActivity as deleteActivityFromDB } from '@/lib/database'
 import { mockChildren, mockActivities, timeSlots, weekDays, type Activity, type Child } from '@/lib/mockData'
 import ActivityModal from '@/components/ActivityModal'
+import GeneratePlanModal from '@/components/GeneratePlanModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
@@ -239,6 +240,7 @@ export default function Dashboard() {
   const [showLoadMenu, setShowLoadMenu] = useState(false)
   const [viewType, setViewType] = useState<'today' | 'week' | 'month'>('week')
   const [showViewMenu, setShowViewMenu] = useState(false)
+  const [showGeneratePlan, setShowGeneratePlan] = useState(false)
   const [, setCopiedActivity] = useState<Activity | null>(null)
   const [history, setHistory] = useState<Activity[][]>([mockActivities])
   const [historyIndex, setHistoryIndex] = useState(0)
@@ -265,7 +267,6 @@ export default function Dashboard() {
         try {
           const userChildren = await getChildren(user.id)
           const userActivities = await getActivities(user.id)
-          console.log('Loaded activities from database:', userActivities)
           setChildren(userChildren as any)
           setActivities(userActivities as any)
         } catch (error) {
@@ -422,11 +423,6 @@ export default function Dashboard() {
     // Filter by week/day/month based on view type
     if (viewType === 'week') {
       const { startOfWeek, endOfWeek } = getWeekDateRange()
-      console.log('Week filtering:', {
-        startOfWeek: startOfWeek.toISOString(),
-        endOfWeek: endOfWeek.toISOString(),
-        currentWeek: currentWeek.toISOString()
-      })
       filtered = filtered.filter(activity => {
         if (activity.date) {
           // Parse the date string and compare as date strings to avoid timezone issues
@@ -435,13 +431,6 @@ export default function Dashboard() {
           const endDateStr = endOfWeek.toISOString().split('T')[0]
           
           const inRange = activityDateStr >= startDateStr && activityDateStr <= endDateStr
-          if (!inRange) {
-            console.log(`Activity ${activity.title} filtered out:`, {
-              activityDate: activityDateStr,
-              startOfWeek: startDateStr,
-              endOfWeek: endDateStr
-            })
-          }
           return inRange
         }
         // For activities without dates, don't show them
@@ -454,20 +443,9 @@ export default function Dashboard() {
       const day = String(currentWeek.getDate()).padStart(2, '0')
       const todayStr = `${year}-${month}-${day}`
       
-      console.log('Today filtering:', {
-        currentWeek: currentWeek.toISOString(),
-        todayStr: todayStr
-      })
-      
       filtered = filtered.filter(activity => {
         if (activity.date) {
           const matches = activity.date === todayStr
-          if (!matches) {
-            console.log(`Activity ${activity.title} filtered out from today:`, {
-              activityDate: activity.date,
-              todayStr: todayStr
-            })
-          }
           return matches
         }
         // Fallback: show activities for the current day name if no date
@@ -485,24 +463,10 @@ export default function Dashboard() {
       const nextYear = month === 11 ? year + 1 : year
       const monthEnd = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`
       
-      console.log('Month filtering:', {
-        year,
-        month: month + 1,
-        monthStart,
-        monthEnd
-      })
-      
       filtered = filtered.filter(activity => {
         if (activity.date) {
           // Compare date strings directly
           const inRange = activity.date >= monthStart && activity.date < monthEnd
-          if (!inRange) {
-            console.log(`Activity ${activity.title} filtered out from month:`, {
-              activityDate: activity.date,
-              monthStart,
-              monthEnd
-            })
-          }
           return inRange
         }
         // For activities without dates, don't show them in month view
@@ -534,9 +498,6 @@ export default function Dashboard() {
     const slotActivities = filteredActivities.filter(a => 
       a.day === day && a.startTime === time
     )
-    if (slotActivities.length > 0) {
-      console.log(`Activities for ${day} at ${time}:`, slotActivities)
-    }
     return slotActivities
   }
 
@@ -653,10 +614,7 @@ export default function Dashboard() {
           await updateActivity(activity.id, activity)
         }
       } else {
-        // Add new activity optimistically with temp ID
-        const tempActivity = { ...activity, id: activity.id || `temp-${Date.now()}` }
-        setActivities([...activities, tempActivity])
-        
+        // Create new activity
         if (user) {
           // Create in database and get the real ID
           const dbActivity = await createActivity({
@@ -664,9 +622,12 @@ export default function Dashboard() {
             user_id: user.id
           } as any)
           
-          // Reload all activities from database to ensure we have the latest data with proper dates
-          const updatedActivities = await getActivities(user.id)
-          setActivities(updatedActivities as any)
+          // Add the new activity with the real database ID
+          setActivities([...activities, dbActivity])
+        } else {
+          // No user, just add to local state with temp ID
+          const tempActivity = { ...activity, id: `temp-${Date.now()}` }
+          setActivities([...activities, tempActivity])
         }
       }
     } catch (error) {
@@ -697,117 +658,6 @@ export default function Dashboard() {
       // Restore the activity on error
       setActivities(originalActivities)
     }
-  }
-
-  // Generate AI plan (mock)
-  const generatePlan = () => {
-    // Clear existing activities first if user confirms
-    if (activities.length > 0) {
-      if (!confirm('This will replace your current schedule. Continue?')) {
-        return
-      }
-    }
-    
-    // Reset plan tracking since this is a new generated plan
-    setCurrentPlanId(null)
-    setCurrentPlanName('Generated Plan')
-
-    const newActivities: Activity[] = []
-    const activityTemplates = [
-      // Monday
-      { day: 'Monday', time: '09:00', activities: [
-        { title: 'Morning Circle', subject: 'Life Skills' },
-        { title: 'Math Foundations', subject: 'Mathematics' }
-      ]},
-      { day: 'Monday', time: '10:30', activities: [
-        { title: 'Reading Time', subject: 'Language Arts' },
-        { title: 'Phonics Practice', subject: 'Language Arts' }
-      ]},
-      { day: 'Monday', time: '13:00', activities: [
-        { title: 'Science Lab', subject: 'Science' },
-        { title: 'Nature Study', subject: 'Science' }
-      ]},
-      // Tuesday
-      { day: 'Tuesday', time: '09:00', activities: [
-        { title: 'Math Games', subject: 'Mathematics' },
-        { title: 'Number Sense', subject: 'Mathematics' }
-      ]},
-      { day: 'Tuesday', time: '11:00', activities: [
-        { title: 'Creative Writing', subject: 'Language Arts' },
-        { title: 'Story Time', subject: 'Language Arts' }
-      ]},
-      { day: 'Tuesday', time: '14:00', activities: [
-        { title: 'Art Workshop', subject: 'Art' },
-        { title: 'Drawing Basics', subject: 'Art' }
-      ]},
-      // Wednesday
-      { day: 'Wednesday', time: '09:30', activities: [
-        { title: 'Geography', subject: 'Social Studies' },
-        { title: 'Map Skills', subject: 'Social Studies' }
-      ]},
-      { day: 'Wednesday', time: '10:30', activities: [
-        { title: 'PE Activities', subject: 'Physical Education' },
-        { title: 'Movement Games', subject: 'Physical Education' }
-      ]},
-      { day: 'Wednesday', time: '13:30', activities: [
-        { title: 'Music Theory', subject: 'Music' },
-        { title: 'Rhythm Practice', subject: 'Music' }
-      ]},
-      // Thursday
-      { day: 'Thursday', time: '09:00', activities: [
-        { title: 'Problem Solving', subject: 'Mathematics' },
-        { title: 'Logic Puzzles', subject: 'Mathematics' }
-      ]},
-      { day: 'Thursday', time: '11:00', activities: [
-        { title: 'Book Club', subject: 'Language Arts' },
-        { title: 'Reading Comprehension', subject: 'Language Arts' }
-      ]},
-      { day: 'Thursday', time: '14:00', activities: [
-        { title: 'Cooking Class', subject: 'Life Skills' },
-        { title: 'Kitchen Math', subject: 'Life Skills' }
-      ]},
-      // Friday
-      { day: 'Friday', time: '09:00', activities: [
-        { title: 'Weekly Review', subject: 'Life Skills' },
-        { title: 'Show & Tell', subject: 'Language Arts' }
-      ]},
-      { day: 'Friday', time: '10:30', activities: [
-        { title: 'STEM Project', subject: 'Science' },
-        { title: 'Engineering Challenge', subject: 'Science' }
-      ]},
-      { day: 'Friday', time: '13:00', activities: [
-        { title: 'Free Choice', subject: 'Free Play' },
-        { title: 'Games Hour', subject: 'Free Play' }
-      ]}
-    ]
-    
-    children.forEach((child, childIndex) => {
-      activityTemplates.forEach(slot => {
-        const activity = slot.activities[childIndex % slot.activities.length]
-        newActivities.push({
-          id: Date.now().toString() + Math.random(),
-          childId: child.id,
-          title: activity.title,
-          subject: activity.subject,
-          description: `Tailored for ${child.name}'s learning style and goals`,
-          day: slot.day,
-          startTime: slot.time,
-          endTime: slot.time.includes('30') ? 
-            `${parseInt(slot.time.split(':')[0]) + 1}:00` : 
-            `${parseInt(slot.time.split(':')[0])}:30`,
-          enhanced: true,
-          materials: [`Materials for ${child.name}`],
-          instructions: [`Step-by-step instructions tailored for ${child.grade || 'grade level'}`],
-          objectives: [`Learning objectives based on ${child.goals.join(', ') || 'educational goals'}`]
-        })
-      })
-    })
-    
-    // Replace all activities with the new generated ones
-    setActivities(newActivities)
-    
-    // Show success message
-    alert(`Generated a weekly plan with ${newActivities.length} activities for ${children.length} child${children.length !== 1 ? 'ren' : ''}!`)
   }
 
   // Save current plan
@@ -1019,6 +869,17 @@ export default function Dashboard() {
               </div>
               
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 print:hidden">
+                {/* Generate Plan Button */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowGeneratePlan(true)}
+                  className="h-8"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Generate Plan
+                </Button>
+                
                 <ThemeToggle />
                 
                 {/* Settings Button */}
@@ -1057,12 +918,6 @@ export default function Dashboard() {
                 
                 <div className="border-l pl-3">
                   <div className="flex flex-col gap-2">
-                    {/* Primary action */}
-                    <Button onClick={generatePlan} className="w-full">
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Generate Plan
-                    </Button>
-                    
                     {/* Secondary actions */}
                     <div className="flex gap-1">
                       <Button 
@@ -1311,43 +1166,10 @@ export default function Dashboard() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => {
-                        // Generate sample activities
-                        setIsLoading(true)
-                        setTimeout(() => {
-                          const subjects = ['Math', 'Science', 'Reading', 'Art', 'Music', 'PE']
-                          const newActivities: Activity[] = []
-                          
-                          children.forEach(child => {
-                            weekDays.slice(0, 5).forEach(day => {
-                              const randomSubject = subjects[Math.floor(Math.random() * subjects.length)]
-                              const randomTime = timeSlots[Math.floor(Math.random() * 8)]
-                              
-                              if (Math.random() > 0.5) {
-                                newActivities.push({
-                                  id: Date.now().toString() + Math.random(),
-                                  childId: child.id,
-                                  title: `${randomSubject} Lesson`,
-                                  subject: randomSubject,
-                                  description: `${randomSubject} activities for ${child.name}`,
-                                  day,
-                                  startTime: randomTime,
-                                  endTime: randomTime,
-                                  enhanced: Math.random() > 0.7,
-                                  recurring: Math.random() > 0.8,
-                                  recurrenceRule: 'weekly'
-                                })
-                              }
-                            })
-                          })
-                          
-                          saveToHistory(newActivities)
-                          setIsLoading(false)
-                        }, 1000)
-                      }}
+                      onClick={() => setShowGeneratePlan(true)}
                     >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Generate Sample Schedule
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate Plan
                     </Button>
                   </div>
                 </div>
@@ -1638,6 +1460,43 @@ export default function Dashboard() {
           day={modalDay}
           time={modalTime}
           currentWeek={currentWeek}
+        />
+        
+        {/* Generate Plan Modal */}
+        <GeneratePlanModal
+          isOpen={showGeneratePlan}
+          onClose={() => setShowGeneratePlan(false)}
+          children={children}
+          currentWeek={currentWeek}
+          existingActivities={activities}
+          onGenerate={async (generatedActivities) => {
+            if (!user) return
+            
+            try {
+              // Batch create all activities at once instead of one by one
+              const activitiesToCreate = generatedActivities.map(activity => {
+                const { id, ...activityWithoutId } = activity
+                return {
+                  ...activityWithoutId,
+                  user_id: user.id
+                }
+              })
+              
+              // Create all activities in the database
+              const createdActivities = []
+              for (const activity of activitiesToCreate) {
+                const dbActivity = await createActivity(activity as any)
+                createdActivities.push(dbActivity)
+              }
+              
+              // Update the UI once with all new activities
+              setActivities([...activities, ...createdActivities])
+              setShowGeneratePlan(false)
+            } catch (error) {
+              console.error('Error saving generated activities:', error)
+              setError('Failed to save generated activities')
+            }
+          }}
         />
 
         {/* Activity Detail Sidebar */}

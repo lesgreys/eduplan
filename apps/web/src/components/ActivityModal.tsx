@@ -121,16 +121,6 @@ export default function ActivityModal({
     const dayNum = String(targetDate.getDate()).padStart(2, '0')
     const dateString = `${year}-${month}-${dayNum}`
     
-    // Debug logging
-    console.log('ActivityModal date calculation:', {
-      baseDate: baseDate.toISOString(),
-      cleanDate: cleanDate.toISOString(),
-      mondayOfWeek: mondayOfWeek.toISOString(),
-      targetDay,
-      daysFromMonday,
-      targetDate: targetDate.toISOString(),
-      finalDateString: dateString
-    })
     
     const activityToSave: Activity = {
       id: activity?.id || Date.now().toString(),
