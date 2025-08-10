@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -45,6 +45,14 @@ export default function GeneratePlanModal({
     includeGroupActivities: true,
     avoidTimeSlots: []
   })
+  
+  // Update weekStart whenever currentWeek changes
+  useEffect(() => {
+    setPreferences(prev => ({
+      ...prev,
+      weekStart: currentWeek
+    }))
+  }, [currentWeek])
   const [generatedActivities, setGeneratedActivities] = useState<Activity[]>([])
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set())
   const [showAdvanced, setShowAdvanced] = useState(false)
