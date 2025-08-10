@@ -368,6 +368,7 @@ Return JSON:
     subject: outline.subject,
     description: details.description,
     day: outline.day,
+    date: activityDate.toISOString().split('T')[0],
     startTime: outline.startTime,
     endTime: outline.endTime,
     materials: [], // Will be added in step 3

@@ -275,7 +275,8 @@ export default function Dashboard() {
             startTime: activity.startTime || activity.start_time,
             endTime: activity.endTime || activity.end_time,
             completedAt: activity.completedAt || activity.completed_at,
-            recurrenceRule: activity.recurrenceRule || activity.recurrence_rule
+            recurrenceRule: activity.recurrenceRule || activity.recurrence_rule,
+            date: activity.date
           }))
           setActivities(formattedActivities as Activity[])
         } catch (error) {
@@ -1620,7 +1621,7 @@ export default function Dashboard() {
             try {
               // Batch create all activities at once instead of one by one
               const activitiesToCreate = generatedActivities.map(activity => {
-                const { id, date, ...activityWithoutId } = activity
+                const { id, ...activityWithoutId } = activity
                 return {
                   ...activityWithoutId,
                   user_id: user.id
@@ -1639,7 +1640,8 @@ export default function Dashboard() {
                   startTime: dbActivity.startTime || (dbActivity as any).start_time,
                   endTime: dbActivity.endTime || (dbActivity as any).end_time,
                   completedAt: dbActivity.completedAt || (dbActivity as any).completed_at,
-                  recurrenceRule: dbActivity.recurrenceRule || (dbActivity as any).recurrence_rule
+                  recurrenceRule: dbActivity.recurrenceRule || (dbActivity as any).recurrence_rule,
+                  date: dbActivity.date || (dbActivity as any).date
                 }
                 createdActivities.push(formattedActivity)
               }
