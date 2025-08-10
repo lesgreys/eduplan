@@ -15,6 +15,7 @@ interface ActivityModalProps {
   children: Child[]
   day: string
   time: string
+  currentWeek?: Date
 }
 
 export default function ActivityModal({
@@ -25,7 +26,8 @@ export default function ActivityModal({
   activity,
   children,
   day,
-  time
+  time,
+  currentWeek
 }: ActivityModalProps) {
   const [formData, setFormData] = useState<Partial<Activity>>({
     childId: children[0]?.id || '',
@@ -83,6 +85,53 @@ export default function ActivityModal({
   }
 
   const handleSave = () => {
+    // Calculate the date based on the selected day of the week
+    const baseDate = currentWeek || new Date()
+    
+    // Create a clean date at noon to avoid timezone issues
+    const cleanDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 12, 0, 0)
+    
+    // Find the Monday of the week containing baseDate
+    const dayOfWeek = cleanDate.getDay()
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const mondayOfWeek = new Date(cleanDate)
+    mondayOfWeek.setDate(cleanDate.getDate() + daysToMonday)
+    
+    // Map day names to offsets from Monday
+    const dayToOffset: Record<string, number> = {
+      'Monday': 0,
+      'Tuesday': 1,
+      'Wednesday': 2,
+      'Thursday': 3,
+      'Friday': 4,
+      'Saturday': 5,
+      'Sunday': 6
+    }
+    
+    const targetDay = formData.day || day
+    const daysFromMonday = dayToOffset[targetDay] ?? 0
+    
+    // Calculate the target date
+    const targetDate = new Date(mondayOfWeek)
+    targetDate.setDate(mondayOfWeek.getDate() + daysFromMonday)
+    
+    // Format as YYYY-MM-DD in local timezone
+    const year = targetDate.getFullYear()
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+    const dayNum = String(targetDate.getDate()).padStart(2, '0')
+    const dateString = `${year}-${month}-${dayNum}`
+    
+    // Debug logging
+    console.log('ActivityModal date calculation:', {
+      baseDate: baseDate.toISOString(),
+      cleanDate: cleanDate.toISOString(),
+      mondayOfWeek: mondayOfWeek.toISOString(),
+      targetDay,
+      daysFromMonday,
+      targetDate: targetDate.toISOString(),
+      finalDateString: dateString
+    })
+    
     const activityToSave: Activity = {
       id: activity?.id || Date.now().toString(),
       childId: formData.childId || '',
@@ -90,6 +139,7 @@ export default function ActivityModal({
       subject: formData.subject || subjects[0],
       description: formData.description || '',
       day: formData.day || day,
+      date: dateString, // Use the manually formatted date string
       startTime: formData.startTime || time,
       endTime: formData.endTime || getEndTime(time),
       materials: formData.materials || [],

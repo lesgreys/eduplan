@@ -38,6 +38,7 @@ export interface Activity {
   subject: string
   description: string
   day: string
+  date?: string  // ISO date string (YYYY-MM-DD)
   startTime: string  // Using camelCase
   endTime: string    // Using camelCase
   materials?: string[]

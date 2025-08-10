@@ -102,7 +102,8 @@ export async function getActivities(userId: string) {
     startTime: activity.start_time,
     endTime: activity.end_time,
     completedAt: activity.completed_at,
-    recurrenceRule: activity.recurrence_rule
+    recurrenceRule: activity.recurrence_rule,
+    date: activity.date
   })) as Activity[]
 }
 
@@ -115,6 +116,7 @@ export async function createActivity(activity: Omit<Activity, 'id' | 'created_at
     subject: activity.subject,
     description: activity.description,
     day: activity.day,
+    date: activity.date,
     start_time: activity.startTime,
     end_time: activity.endTime,
     materials: activity.materials,
@@ -142,7 +144,8 @@ export async function createActivity(activity: Omit<Activity, 'id' | 'created_at
     startTime: data.start_time,
     endTime: data.end_time,
     completedAt: data.completed_at,
-    recurrenceRule: data.recurrence_rule
+    recurrenceRule: data.recurrence_rule,
+    date: data.date
   } as Activity
 }
 
@@ -154,6 +157,7 @@ export async function updateActivity(id: string, updates: Partial<Activity>) {
   if (updates.subject !== undefined) dbUpdates.subject = updates.subject
   if (updates.description !== undefined) dbUpdates.description = updates.description
   if (updates.day !== undefined) dbUpdates.day = updates.day
+  if (updates.date !== undefined) dbUpdates.date = updates.date
   if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime
   if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime
   if (updates.materials !== undefined) dbUpdates.materials = updates.materials
@@ -181,7 +185,8 @@ export async function updateActivity(id: string, updates: Partial<Activity>) {
     startTime: data.start_time,
     endTime: data.end_time,
     completedAt: data.completed_at,
-    recurrenceRule: data.recurrence_rule
+    recurrenceRule: data.recurrence_rule,
+    date: data.date
   } as Activity
 }
 

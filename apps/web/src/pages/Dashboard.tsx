@@ -395,12 +395,127 @@ export default function Dashboard() {
   }
 
   // Paste activity
-  // Filter activities based on selected view and search
-  const filteredActivities = (() => {
-    let filtered = selectedView === 'family' 
-      ? activities 
-      : activities.filter(a => a.childId === selectedView)
+  // Get week date range for filtering
+  const getWeekDateRange = () => {
+    // Create a clean date at noon to avoid timezone issues
+    const cleanDate = new Date(currentWeek.getFullYear(), currentWeek.getMonth(), currentWeek.getDate(), 12, 0, 0)
     
+    // Find Monday of this week
+    const dayOfWeek = cleanDate.getDay()
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const startOfWeek = new Date(cleanDate)
+    startOfWeek.setDate(cleanDate.getDate() + daysToMonday)
+    startOfWeek.setHours(0, 0, 0, 0)
+    
+    // Sunday is 6 days after Monday
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+    endOfWeek.setHours(23, 59, 59, 999)
+    
+    return { startOfWeek, endOfWeek }
+  }
+  
+  // Filter activities based on selected view, week, and search
+  const filteredActivities = (() => {
+    let filtered = activities
+    
+    // Filter by week/day/month based on view type
+    if (viewType === 'week') {
+      const { startOfWeek, endOfWeek } = getWeekDateRange()
+      console.log('Week filtering:', {
+        startOfWeek: startOfWeek.toISOString(),
+        endOfWeek: endOfWeek.toISOString(),
+        currentWeek: currentWeek.toISOString()
+      })
+      filtered = filtered.filter(activity => {
+        if (activity.date) {
+          // Parse the date string and compare as date strings to avoid timezone issues
+          const activityDateStr = activity.date
+          const startDateStr = startOfWeek.toISOString().split('T')[0]
+          const endDateStr = endOfWeek.toISOString().split('T')[0]
+          
+          const inRange = activityDateStr >= startDateStr && activityDateStr <= endDateStr
+          if (!inRange) {
+            console.log(`Activity ${activity.title} filtered out:`, {
+              activityDate: activityDateStr,
+              startOfWeek: startDateStr,
+              endOfWeek: endDateStr
+            })
+          }
+          return inRange
+        }
+        // For activities without dates, don't show them
+        return false
+      })
+    } else if (viewType === 'today') {
+      // Format today's date as YYYY-MM-DD in local timezone
+      const year = currentWeek.getFullYear()
+      const month = String(currentWeek.getMonth() + 1).padStart(2, '0')
+      const day = String(currentWeek.getDate()).padStart(2, '0')
+      const todayStr = `${year}-${month}-${day}`
+      
+      console.log('Today filtering:', {
+        currentWeek: currentWeek.toISOString(),
+        todayStr: todayStr
+      })
+      
+      filtered = filtered.filter(activity => {
+        if (activity.date) {
+          const matches = activity.date === todayStr
+          if (!matches) {
+            console.log(`Activity ${activity.title} filtered out from today:`, {
+              activityDate: activity.date,
+              todayStr: todayStr
+            })
+          }
+          return matches
+        }
+        // Fallback: show activities for the current day name if no date
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        const todayName = dayNames[currentWeek.getDay()]
+        return activity.day === todayName && !activity.date
+      })
+    } else if (viewType === 'month') {
+      const year = currentWeek.getFullYear()
+      const month = currentWeek.getMonth()
+      
+      // Calculate start and end of month as date strings
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const nextMonth = month === 11 ? 0 : month + 1
+      const nextYear = month === 11 ? year + 1 : year
+      const monthEnd = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`
+      
+      console.log('Month filtering:', {
+        year,
+        month: month + 1,
+        monthStart,
+        monthEnd
+      })
+      
+      filtered = filtered.filter(activity => {
+        if (activity.date) {
+          // Compare date strings directly
+          const inRange = activity.date >= monthStart && activity.date < monthEnd
+          if (!inRange) {
+            console.log(`Activity ${activity.title} filtered out from month:`, {
+              activityDate: activity.date,
+              monthStart,
+              monthEnd
+            })
+          }
+          return inRange
+        }
+        // For activities without dates, don't show them in month view
+        return false
+      })
+    }
+    
+    // Filter by child view
+    if (selectedView !== 'family') {
+      filtered = filtered.filter(a => a.childId === selectedView)
+    }
+    
+    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(a => 
         a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -549,10 +664,9 @@ export default function Dashboard() {
             user_id: user.id
           } as any)
           
-          // Replace temp activity with real one from database
-          setActivities(current => 
-            current.map(a => a.id === tempActivity.id ? { ...activity, id: dbActivity.id } : a)
-          )
+          // Reload all activities from database to ensure we have the latest data with proper dates
+          const updatedActivities = await getActivities(user.id)
+          setActivities(updatedActivities as any)
         }
       }
     } catch (error) {
@@ -786,24 +900,94 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-light">
-                        {viewType === 'today' ? 'Today' : viewType === 'week' ? 'Weekly Schedule' : 'Monthly Overview'}
-                      </h1>
-                      {/* View Type Dropdown */}
-                      <div className="relative">
+                      {/* Combined Navigation and View Controls */}
+                      <div className="flex items-center gap-1">
+                        {/* Previous Button */}
                         <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setShowViewMenu(!showViewMenu)}
-                          className="h-8"
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-r-none border-r-0" 
+                          onClick={() => {
+                            const newWeek = new Date(currentWeek)
+                            if (viewType === 'today') {
+                              newWeek.setDate(newWeek.getDate() - 1)
+                            } else if (viewType === 'week') {
+                              newWeek.setDate(newWeek.getDate() - 7)
+                            } else {
+                              newWeek.setMonth(newWeek.getMonth() - 1)
+                            }
+                            setCurrentWeek(newWeek)
+                          }}
+                          title={viewType === 'week' ? 'Previous week' : viewType === 'today' ? 'Previous day' : 'Previous month'}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        
+                        {/* Date Picker in the middle */}
+                        <div className="relative">
+                          <input
+                            id="date-picker"
+                            type="date"
+                            value={currentWeek.toISOString().split('T')[0]}
+                            onChange={(e) => setCurrentWeek(new Date(e.target.value))}
+                            className="absolute opacity-0 w-full h-8 cursor-pointer z-10"
+                            title="Jump to specific date"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 px-3 rounded-none border-x-0" 
+                          >
+                            <Calendar className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        
+                        {/* Next Button */}
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-l-none border-l-0" 
+                          onClick={() => {
+                            const newWeek = new Date(currentWeek)
+                            if (viewType === 'today') {
+                              newWeek.setDate(newWeek.getDate() + 1)
+                            } else if (viewType === 'week') {
+                              newWeek.setDate(newWeek.getDate() + 7)
+                            } else {
+                              newWeek.setMonth(newWeek.getMonth() + 1)
+                            }
+                            setCurrentWeek(newWeek)
+                          }}
+                          title={viewType === 'week' ? 'Next week' : viewType === 'today' ? 'Next day' : 'Next month'}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      
+                      {/* Split Button for Today/Week/Month */}
+                      <div className="relative flex">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setCurrentWeek(new Date())} 
+                          className="h-8 px-3 rounded-r-none border-r-0"
+                          title="Go to current period"
                         >
                           {viewType === 'today' && <CalendarDays className="w-4 h-4 mr-1" />}
                           {viewType === 'week' && <Calendar className="w-4 h-4 mr-1" />}
                           {viewType === 'month' && <CalendarRange className="w-4 h-4 mr-1" />}
-                          <ChevronDown className="w-3 h-3 ml-1" />
+                          {viewType === 'week' ? 'This Week' : viewType === 'today' ? 'Today' : 'This Month'}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => setShowViewMenu(!showViewMenu)}
+                          className="h-8 w-8 rounded-l-none"
+                        >
+                          <ChevronDown className="w-3 h-3" />
                         </Button>
                         {showViewMenu && (
-                          <div className="absolute top-full mt-1 left-0 w-32 bg-background border rounded-lg shadow-lg z-50">
+                          <div className="absolute top-full mt-1 right-0 w-32 bg-background border rounded-lg shadow-lg z-50">
                             <button
                               onClick={() => { setViewType('today'); setShowViewMenu(false) }}
                               className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
@@ -830,39 +1014,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">{getWeekDisplay()}</p>
-                  </div>
-                  
-                  {/* Week Navigation */}
-                  <div className="flex gap-1 items-center border-l pl-3 print:hidden">
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {
-                      const newWeek = new Date(currentWeek)
-                      if (viewType === 'today') {
-                        newWeek.setDate(newWeek.getDate() - 1)
-                      } else if (viewType === 'week') {
-                        newWeek.setDate(newWeek.getDate() - 7)
-                      } else {
-                        newWeek.setMonth(newWeek.getMonth() - 1)
-                      }
-                      setCurrentWeek(newWeek)
-                    }}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())} className="h-8 px-3">
-                      Today
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {
-                      const newWeek = new Date(currentWeek)
-                      if (viewType === 'today') {
-                        newWeek.setDate(newWeek.getDate() + 1)
-                      } else if (viewType === 'week') {
-                        newWeek.setDate(newWeek.getDate() + 7)
-                      } else {
-                        newWeek.setMonth(newWeek.getMonth() + 1)
-                      }
-                      setCurrentWeek(newWeek)
-                    }}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -1364,8 +1515,12 @@ export default function Dashboard() {
                       
                       // Add actual days
                       for (let day = 1; day <= totalDays; day++) {
-                        const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][(startPadding + day - 1) % 7]
-                        const dayActivities = filteredActivities.filter(a => a.day === dayOfWeek)
+                        // Create date string for this day
+                        const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                        
+                        // Filter activities for this specific date
+                        const dayActivities = filteredActivities.filter(a => a.date === dayDateStr)
+                        
                         const isToday = new Date().getDate() === day && 
                                        new Date().getMonth() === month && 
                                        new Date().getFullYear() === year
@@ -1482,6 +1637,7 @@ export default function Dashboard() {
           children={children}
           day={modalDay}
           time={modalTime}
+          currentWeek={currentWeek}
         />
 
         {/* Activity Detail Sidebar */}
