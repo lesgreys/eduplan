@@ -122,6 +122,7 @@ export default function ActivityModal({
       subject: formData.subject || subjects[0],
       description: formData.description || '',
       day: formData.day || day,
+      date: targetDate.toISOString().split('T')[0],
       startTime: formData.startTime || time,
       endTime: formData.endTime || getEndTime(time),
       materials: formData.materials || [],
