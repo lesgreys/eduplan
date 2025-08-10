@@ -313,7 +313,7 @@ export async function generateMockActivities(params: GenerateActivitiesParams): 
   
   const { preferences, children } = params
   const activities: Activity[] = []
-  const timeSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
+  const timeSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00']
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   const subjects = preferences.subjectFocus.length > 0 ? preferences.subjectFocus : ['Math', 'Science', 'Reading', 'Art']
   

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { X, Plus, Trash2 } from 'lucide-react'
-import { subjects, type Activity, type Child } from '@/lib/mockData'
+import { subjects, timeSlots, type Activity, type Child } from '@/lib/mockData'
 
 interface ActivityModalProps {
   isOpen: boolean
@@ -277,7 +277,7 @@ export default function ActivityModal({
                 value={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
               >
-                {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00'].map(t => (
+                {timeSlots.slice(0, -1).map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
@@ -290,7 +290,7 @@ export default function ActivityModal({
                 value={formData.endTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
               >
-                {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00']
+                {timeSlots
                   .filter(t => t > (formData.startTime || '09:00'))
                   .map(t => (
                     <option key={t} value={t}>{t}</option>
