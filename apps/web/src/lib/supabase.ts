@@ -33,21 +33,21 @@ export interface Child {
 export interface Activity {
   id: string
   user_id: string
-  child_id: string
+  childId: string  // Using camelCase for consistency with frontend
   title: string
   subject: string
   description: string
   day: string
-  start_time: string
-  end_time: string
+  startTime: string  // Using camelCase
+  endTime: string    // Using camelCase
   materials?: string[]
   instructions?: string[]
   objectives?: string[]
   enhanced: boolean
   status?: 'pending' | 'completed' | 'skipped'
-  completed_at?: string
+  completedAt?: string  // Using camelCase
   recurring?: boolean
-  recurrence_rule?: 'weekly' | 'biweekly' | 'monthly'
+  recurrenceRule?: 'weekly' | 'biweekly' | 'monthly'  // Using camelCase
   created_at: string
   updated_at: string
 }
