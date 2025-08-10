@@ -116,7 +116,8 @@ export async function generateActivitiesMultiStep(
         item,
         children.find(c => c.id === item.childId)!,
         customSettings,
-        apiKey
+        apiKey,
+        preferences.weekStart
       )
       
       activities.push(details)
@@ -283,7 +284,8 @@ async function generateActivityDetails(
     focusAreas: string[]
     avoidTopics: string[]
   },
-  apiKey: string
+  apiKey: string,
+  weekStart: Date
 ): Promise<Activity> {
   const prompt = `Create detailed instructions for this activity:
 
@@ -355,8 +357,8 @@ Return JSON:
     }
   }
   
-  // Calculate date
-  const mondayOfWeek = getMondayOfWeek(new Date())
+  // Calculate date based on the selected week
+  const mondayOfWeek = getMondayOfWeek(weekStart)
   const dayOffset = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].indexOf(outline.day)
   const activityDate = new Date(mondayOfWeek)
   activityDate.setDate(mondayOfWeek.getDate() + dayOffset)
