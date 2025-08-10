@@ -81,28 +81,28 @@ function DraggableActivity({
         <GripVertical className="w-2.5 h-2.5" />
       </div>
       <div 
-        className="flex-1 py-1 pr-1 cursor-pointer"
+        className="flex-1 py-1 pr-1 cursor-pointer overflow-hidden"
         onClick={(e) => {
           e.stopPropagation()
           onClick()
         }}
       >
         <div className="flex items-start justify-between gap-1">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-0.5">
               {activity.status === 'completed' && (
-                <CheckCircle2 className="w-2.5 h-2.5 text-green-600" />
+                <CheckCircle2 className="w-2.5 h-2.5 text-green-600 flex-shrink-0" />
               )}
               {activity.status === 'skipped' && (
-                <XCircle className="w-2.5 h-2.5 text-red-600" />
+                <XCircle className="w-2.5 h-2.5 text-red-600 flex-shrink-0" />
               )}
-              <span style={{ fontSize: '10px' }}>{child.emoji}</span>
+              <span className="flex-shrink-0" style={{ fontSize: '10px' }}>{child.emoji}</span>
               <p className="font-medium truncate" style={{ fontSize: '11px' }}>{activity.title}</p>
               {activity.recurring && (
-                <RotateCcw className="w-2.5 h-2.5 text-blue-600" />
+                <RotateCcw className="w-2.5 h-2.5 text-blue-600 flex-shrink-0" />
               )}
               {activity.enhanced && (
-                <Sparkles className="w-2.5 h-2.5 text-yellow-600" />
+                <Sparkles className="w-2.5 h-2.5 text-yellow-600 flex-shrink-0" />
               )}
             </div>
             <p className="opacity-75 truncate" style={{ fontSize: '10px' }}>{activity.subject}</p>
@@ -1310,10 +1310,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : viewType === 'week' ? (
-            <Card className="print:shadow-none overflow-x-auto">
-              <CardContent className="p-0">
+            <Card className="print:shadow-none">
+              <CardContent className="p-0 overflow-x-auto">
                 <div className="min-w-[900px]">
-                  <div className="grid" style={{ gridTemplateColumns: '80px repeat(7, 1fr)' }}>
+                  <div className="grid" style={{ gridTemplateColumns: '80px repeat(7, minmax(0, 1fr))' }}>
                     {/* Time column header */}
                     <div className="p-2 text-center border-r bg-muted/30 sticky left-0 bg-background">
                       <Clock className="w-3 h-3 mx-auto text-muted-foreground" />
@@ -1341,7 +1341,7 @@ export default function Dashboard() {
                     const rowHeight = maxActivities > 1 ? Math.max(64, maxActivities * 48) : 64
                     
                     return (
-                      <div key={time} className="grid border-b last:border-b-0" style={{ gridTemplateColumns: '80px repeat(7, 1fr)' }}>
+                      <div key={time} className="grid border-b last:border-b-0" style={{ gridTemplateColumns: '80px repeat(7, minmax(0, 1fr))' }}>
                         {/* Time label */}
                         <div 
                           className="flex items-center justify-center text-xs text-muted-foreground border-r bg-muted/10 sticky left-0 bg-background/95"
@@ -1442,7 +1442,7 @@ export default function Dashboard() {
                   </p>
                   
                   {/* Month Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+                  <div className="grid gap-px bg-border rounded-lg overflow-hidden" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                     {/* Day headers */}
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                       <div key={day} className="bg-muted/30 p-2 text-center text-sm font-medium">
@@ -1516,14 +1516,16 @@ export default function Dashboard() {
                                 return (
                                   <div 
                                     key={`${activity.id}-${index}`}
-                                    className="activity-item text-xs p-1 bg-muted/50 rounded truncate cursor-pointer hover:bg-muted transition-colors"
+                                    className="activity-item text-xs p-1 bg-muted/50 rounded cursor-pointer hover:bg-muted transition-colors overflow-hidden"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setSelectedActivity(activity)
                                     }}
                                   >
-                                    <span className="mr-1">{child.emoji}</span>
-                                    <span>{activity.title}</span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="flex-shrink-0">{child.emoji}</span>
+                                      <span className="truncate">{activity.title}</span>
+                                    </div>
                                   </div>
                                 )
                               })}
