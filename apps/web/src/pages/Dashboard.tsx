@@ -485,23 +485,29 @@ export default function Dashboard() {
         // Update activity position
         const updatedActivity = { ...draggedActivity, day: newDay, startTime: newTime }
         
-        // Update in database if user is logged in
-        if (user) {
-          try {
-            await updateActivity(draggedActivity.id, updatedActivity)
-          } catch (error) {
-            console.error('Error updating activity position:', error)
-            setError('Failed to update activity position')
-            // Don't update local state if database update fails
-            setActiveId(null)
-            return
-          }
-        }
-        
-        // Update local state
+        // Optimistically update local state immediately for snappy UI
         setActivities(activities.map(a => 
           a.id === draggedActivity.id ? updatedActivity : a
         ))
+        
+        // Then update in database if user is logged in
+        if (user) {
+          try {
+            // Only send the changed fields to update
+            await updateActivity(draggedActivity.id, { 
+              day: newDay, 
+              startTime: newTime 
+            })
+          } catch (error) {
+            console.error('Error updating activity position:', error)
+            setError('Failed to save activity position')
+            
+            // Revert the optimistic update on error
+            setActivities(activities.map(a => 
+              a.id === draggedActivity.id ? draggedActivity : a
+            ))
+          }
+        }
       }
     }
 
@@ -518,44 +524,63 @@ export default function Dashboard() {
 
   // Save activity from modal
   const saveActivity = async (activity: Activity) => {
+    const isUpdate = activities.find(a => a.id === activity.id)
+    const originalActivities = [...activities]
+    
     try {
-      if (activities.find(a => a.id === activity.id)) {
-        // Update existing activity
+      if (isUpdate) {
+        // Optimistically update UI immediately
+        setActivities(activities.map(a => a.id === activity.id ? activity : a))
+        
+        // Then update in database
         if (user) {
           await updateActivity(activity.id, activity)
         }
-        setActivities(activities.map(a => a.id === activity.id ? activity : a))
       } else {
-        // Add new activity
-        let newActivity = activity
+        // Add new activity optimistically with temp ID
+        const tempActivity = { ...activity, id: activity.id || `temp-${Date.now()}` }
+        setActivities([...activities, tempActivity])
+        
         if (user) {
           // Create in database and get the real ID
           const dbActivity = await createActivity({
             ...activity,
             user_id: user.id
           } as any)
-          newActivity = { ...activity, id: dbActivity.id }
+          
+          // Replace temp activity with real one from database
+          setActivities(current => 
+            current.map(a => a.id === tempActivity.id ? { ...activity, id: dbActivity.id } : a)
+          )
         }
-        setActivities([...activities, newActivity])
       }
     } catch (error) {
       console.error('Error saving activity:', error)
       setError('Failed to save activity')
+      // Revert to original state on error
+      setActivities(originalActivities)
     }
   }
 
   // Delete activity
   const deleteActivity = async (id: string) => {
+    const originalActivities = [...activities]
+    const activityToDelete = activities.find(a => a.id === id)
+    
+    // Optimistically remove from UI immediately
+    setActivities(activities.filter(a => a.id !== id))
+    setModalOpen(false)
+    setSelectedActivity(null)
+    
     try {
-      if (user) {
+      if (user && activityToDelete) {
         await deleteActivityFromDB(id)
       }
-      setActivities(activities.filter(a => a.id !== id))
-      setModalOpen(false)
-      setSelectedActivity(null)
     } catch (error) {
       console.error('Error deleting activity:', error)
       setError('Failed to delete activity')
+      // Restore the activity on error
+      setActivities(originalActivities)
     }
   }
 

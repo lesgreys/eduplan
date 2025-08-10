@@ -54,9 +54,9 @@ export default function ActivityModal({
         title: '',
         subject: subjects[0],
         description: '',
-        day,
-        startTime: time,
-        endTime: getEndTime(time),
+        day: day || 'Monday',
+        startTime: time || '09:00',
+        endTime: getEndTime(time || '09:00'),
         materials: [],
         instructions: [],
         objectives: [],
@@ -64,6 +64,16 @@ export default function ActivityModal({
       })
     }
   }, [activity, day, time, children])
+  
+  // Update end time when start time changes
+  useEffect(() => {
+    if (formData.startTime && !activity) {
+      setFormData(prev => ({
+        ...prev,
+        endTime: getEndTime(prev.startTime)
+      }))
+    }
+  }, [formData.startTime, activity])
 
   function getEndTime(startTime: string): string {
     const [hours, minutes] = startTime.split(':').map(Number)
@@ -214,12 +224,30 @@ export default function ActivityModal({
           {/* Time */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Day</Label>
-              <Input value={formData.day} disabled />
+              <Label htmlFor="day">Day</Label>
+              <select
+                id="day"
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                value={formData.day}
+                onChange={(e) => setFormData({ ...formData, day: e.target.value })}
+              >
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
-              <Label>Start Time</Label>
-              <Input value={formData.startTime} disabled />
+              <Label htmlFor="startTime">Start Time</Label>
+              <select
+                id="startTime"
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+              >
+                {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00'].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="endTime">End Time</Label>
@@ -229,8 +257,8 @@ export default function ActivityModal({
                 value={formData.endTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
               >
-                {['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30']
-                  .filter(t => t > (formData.startTime || ''))
+                {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00']
+                  .filter(t => t > (formData.startTime || '09:00'))
                   .map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))
