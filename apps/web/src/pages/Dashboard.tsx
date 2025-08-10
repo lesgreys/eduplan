@@ -267,8 +267,17 @@ export default function Dashboard() {
         try {
           const userChildren = await getChildren(user.id)
           const userActivities = await getActivities(user.id)
-          setChildren(userChildren as any)
-          setActivities(userActivities as any)
+          setChildren(userChildren as Child[])
+          // Ensure activities have the correct format
+          const formattedActivities = userActivities.map((activity: any) => ({
+            ...activity,
+            childId: activity.childId || activity.child_id,
+            startTime: activity.startTime || activity.start_time,
+            endTime: activity.endTime || activity.end_time,
+            completedAt: activity.completedAt || activity.completed_at,
+            recurrenceRule: activity.recurrenceRule || activity.recurrence_rule
+          }))
+          setActivities(formattedActivities as Activity[])
         } catch (error) {
           console.error('Error loading data:', error)
           // Use mock data as fallback for now
@@ -1611,7 +1620,7 @@ export default function Dashboard() {
             try {
               // Batch create all activities at once instead of one by one
               const activitiesToCreate = generatedActivities.map(activity => {
-                const { id, ...activityWithoutId } = activity
+                const { id, date, ...activityWithoutId } = activity
                 return {
                   ...activityWithoutId,
                   user_id: user.id
@@ -1622,7 +1631,17 @@ export default function Dashboard() {
               const createdActivities = []
               for (const activity of activitiesToCreate) {
                 const dbActivity = await createActivity(activity as any)
-                createdActivities.push(dbActivity)
+                // Ensure the activity has the correct format
+                const formattedActivity: Activity = {
+                  ...dbActivity,
+                  id: dbActivity.id,
+                  childId: dbActivity.childId || (dbActivity as any).child_id,
+                  startTime: dbActivity.startTime || (dbActivity as any).start_time,
+                  endTime: dbActivity.endTime || (dbActivity as any).end_time,
+                  completedAt: dbActivity.completedAt || (dbActivity as any).completed_at,
+                  recurrenceRule: dbActivity.recurrenceRule || (dbActivity as any).recurrence_rule
+                }
+                createdActivities.push(formattedActivity)
               }
               
               // Update the UI once with all new activities
