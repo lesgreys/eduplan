@@ -154,7 +154,8 @@ function DraggableActivity({
 function DroppableSlot({ 
   day, 
   time, 
-  activities, 
+  activities,
+  children, 
   onActivityClick,
   onEmptyClick,
   onStatusChange,
@@ -164,6 +165,7 @@ function DroppableSlot({
   day: string
   time: string
   activities: Activity[]
+  children: Child[]
   onActivityClick: (activity: Activity) => void
   onEmptyClick: () => void
   onStatusChange?: (id: string, status: 'completed' | 'skipped' | 'pending') => void
@@ -175,7 +177,7 @@ function DroppableSlot({
     data: { day, time }
   })
 
-  const getChild = (childId: string) => mockChildren.find(c => c.id === childId)
+  const getChild = (childId: string) => children.find(c => c.id === childId)
   
   return (
     <div
@@ -262,6 +264,7 @@ export default function Dashboard() {
         try {
           const userChildren = await getChildren(user.id)
           const userActivities = await getActivities(user.id)
+          console.log('Loaded activities from database:', userActivities)
           setChildren(userChildren as any)
           setActivities(userActivities as any)
         } catch (error) {
@@ -412,9 +415,13 @@ export default function Dashboard() {
 
   // Get activities for a specific day and time (filtered by view)
   const getActivitiesForSlot = (day: string, time: string) => {
-    return filteredActivities.filter(a => 
+    const slotActivities = filteredActivities.filter(a => 
       a.day === day && a.startTime === time
     )
+    if (slotActivities.length > 0) {
+      console.log(`Activities for ${day} at ${time}:`, slotActivities)
+    }
+    return slotActivities
   }
 
   // Calculate ISO week number
@@ -1220,6 +1227,7 @@ export default function Dashboard() {
                               day={day}
                               time={time}
                               activities={activities}
+                              children={children}
                               isWeekend={isWeekend}
                               onActivityClick={(activity) => setSelectedActivity(activity)}
                               onEmptyClick={() => openActivityModal(null, day, time)}
