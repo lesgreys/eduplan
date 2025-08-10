@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { getChildren, getActivities } from '@/lib/database'
+import { getChildren, getActivities, createActivity, updateActivity, deleteActivity as deleteActivityFromDB } from '@/lib/database'
 import { mockChildren, mockActivities, timeSlots, weekDays, type Activity, type Child } from '@/lib/mockData'
 import ActivityModal from '@/components/ActivityModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -343,13 +343,19 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [showKeyboardShortcuts, historyIndex, history])
 
-  // Helper to save history for undo/redo
-  const saveToHistory = (newActivities: Activity[]) => {
+  // Helper to save history for undo/redo and persist to database
+  const saveToHistory = async (newActivities: Activity[]) => {
     const newHistory = history.slice(0, historyIndex + 1)
     newHistory.push(newActivities)
     setHistory(newHistory)
     setHistoryIndex(newHistory.length - 1)
     setActivities(newActivities)
+    
+    // Don't save to database if user is not logged in
+    if (!user) return
+    
+    // For now, we'll handle database saves in specific functions
+    // This function just manages local state and history
   }
 
   // Undo function
@@ -450,7 +456,7 @@ export default function Dashboard() {
   }
 
   // Handle drag end
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
     if (!over) {
@@ -470,10 +476,24 @@ export default function Dashboard() {
       
       if (!hasConflict) {
         // Update activity position
+        const updatedActivity = { ...draggedActivity, day: newDay, startTime: newTime }
+        
+        // Update in database if user is logged in
+        if (user) {
+          try {
+            await updateActivity(draggedActivity.id, updatedActivity)
+          } catch (error) {
+            console.error('Error updating activity position:', error)
+            setError('Failed to update activity position')
+            // Don't update local state if database update fails
+            setActiveId(null)
+            return
+          }
+        }
+        
+        // Update local state
         setActivities(activities.map(a => 
-          a.id === draggedActivity.id
-            ? { ...a, day: newDay, startTime: newTime }
-            : a
+          a.id === draggedActivity.id ? updatedActivity : a
         ))
       }
     }
@@ -490,21 +510,46 @@ export default function Dashboard() {
   }
 
   // Save activity from modal
-  const saveActivity = (activity: Activity) => {
-    if (activities.find(a => a.id === activity.id)) {
-      // Update existing
-      setActivities(activities.map(a => a.id === activity.id ? activity : a))
-    } else {
-      // Add new
-      setActivities([...activities, activity])
+  const saveActivity = async (activity: Activity) => {
+    try {
+      if (activities.find(a => a.id === activity.id)) {
+        // Update existing activity
+        if (user) {
+          await updateActivity(activity.id, activity)
+        }
+        setActivities(activities.map(a => a.id === activity.id ? activity : a))
+      } else {
+        // Add new activity
+        let newActivity = activity
+        if (user) {
+          // Create in database and get the real ID
+          const dbActivity = await createActivity({
+            ...activity,
+            user_id: user.id
+          } as any)
+          newActivity = { ...activity, id: dbActivity.id }
+        }
+        setActivities([...activities, newActivity])
+      }
+    } catch (error) {
+      console.error('Error saving activity:', error)
+      setError('Failed to save activity')
     }
   }
 
   // Delete activity
-  const deleteActivity = (id: string) => {
-    setActivities(activities.filter(a => a.id !== id))
-    setModalOpen(false)
-    setSelectedActivity(null)
+  const deleteActivity = async (id: string) => {
+    try {
+      if (user) {
+        await deleteActivityFromDB(id)
+      }
+      setActivities(activities.filter(a => a.id !== id))
+      setModalOpen(false)
+      setSelectedActivity(null)
+    } catch (error) {
+      console.error('Error deleting activity:', error)
+      setError('Failed to delete activity')
+    }
   }
 
   // Generate AI plan (mock)
@@ -1014,6 +1059,24 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="max-w-7xl mx-auto px-4 mt-4">
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-sm">{error}</span>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-600 hover:text-red-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Calendar Grid */}
         <div className="max-w-7xl mx-auto px-4 py-6">
