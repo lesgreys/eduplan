@@ -182,38 +182,39 @@ function DroppableSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`relative border-r last:border-r-0 cursor-pointer group ${
+      className={`relative border-r last:border-r-0 group ${
         isOver ? 'bg-primary/10' : isWeekend ? 'bg-muted/10' : 'hover:bg-muted/5'
       }`}
-      onClick={() => {
-        if (activities.length === 0) {
-          onEmptyClick()
-        }
-      }}
     >
       <div className="p-1 h-full">
-        {activities.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            {activities.map(activity => {
-              const child = getChild(activity.childId)
-              return child ? (
-                <div key={activity.id} className="min-h-[40px]">
-                  <DraggableActivity 
-                    activity={activity} 
-                    child={child} 
-                    onClick={() => onActivityClick(activity)}
-                    onStatusChange={onStatusChange}
-                    onCopy={onCopy}
-                  />
-                </div>
-              ) : null
-            })}
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col gap-1">
+          {activities.map(activity => {
+            const child = getChild(activity.childId)
+            return child ? (
+              <div key={activity.id} className="min-h-[40px]">
+                <DraggableActivity 
+                  activity={activity} 
+                  child={child} 
+                  onClick={() => onActivityClick(activity)}
+                  onStatusChange={onStatusChange}
+                  onCopy={onCopy}
+                />
+              </div>
+            ) : null
+          })}
+          {/* Always show add button, even when there are activities */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onEmptyClick()
+            }}
+            className={`w-full py-2 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
+              activities.length === 0 ? 'min-h-[40px]' : 'opacity-0 group-hover:opacity-100'
+            }`}
+          >
             <Plus className="w-3 h-3 text-muted-foreground" />
-          </div>
-        )}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1298,45 +1299,19 @@ export default function Dashboard() {
                             {time}
                           </div>
                           
-                          {/* Activities */}
-                          <div className="flex-1 p-4">
-                            {dayActivities.length > 0 ? (
-                              <div className="space-y-2">
-                                {dayActivities.map(activity => {
-                                  const child = getChild(activity.childId)
-                                  if (!child) return null
-                                  
-                                  return (
-                                    <div
-                                      key={activity.id}
-                                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border cursor-pointer hover:bg-muted/50 transition-colors"
-                                      onClick={() => setSelectedActivity(activity)}
-                                    >
-                                      <div className="text-2xl">{child.emoji}</div>
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <h4 className="font-medium">{activity.title}</h4>
-                                          {activity.enhanced && (
-                                            <Sparkles className="w-4 h-4 text-yellow-600" />
-                                          )}
-                                        </div>
-                                        <p className="text-sm text-muted-foreground">{activity.subject}</p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {child.name} • {activity.startTime} - {activity.endTime}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => openActivityModal(null, todayName, time)}
-                                className="w-full p-8 border-2 border-dashed border-muted-foreground/20 rounded-lg hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center group"
-                              >
-                                <Plus className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground/60" />
-                              </button>
-                            )}
+                          {/* Activities - Using DroppableSlot for drag and drop */}
+                          <div className="flex-1">
+                            <DroppableSlot
+                              day={todayName}
+                              time={time}
+                              activities={dayActivities}
+                              children={children}
+                              isWeekend={currentWeek.getDay() === 0 || currentWeek.getDay() === 6}
+                              onActivityClick={(activity) => setSelectedActivity(activity)}
+                              onEmptyClick={() => openActivityModal(null, todayName, time)}
+                              onStatusChange={updateActivityStatus}
+                              onCopy={copyActivity}
+                            />
                           </div>
                         </div>
                       )
