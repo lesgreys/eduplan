@@ -17,7 +17,7 @@ interface GenerateActivitiesParams {
   existingActivities: Activity[]
 }
 
-function createSystemPrompt(): string {
+export function createSystemPrompt(): string {
   return `You are an expert homeschool curriculum planner and educational consultant. Your task is to generate personalized, age-appropriate educational activities for homeschooled children.
 
 You should:
@@ -50,7 +50,7 @@ Format your response as a JSON array of activity objects with this exact structu
 CRITICAL: The childId field MUST contain the UUID provided in parentheses (ID: xxx) after each child's name, NOT the child's name itself.`
 }
 
-function createUserPrompt(params: GenerateActivitiesParams): string {
+export function createUserPrompt(params: GenerateActivitiesParams): string {
   const { preferences, children, existingActivities } = params
   
   // Get children details with their IDs
@@ -118,12 +118,70 @@ Additional guidelines:
 Generate a complete weekly schedule with activities distributed across Monday through Friday.`
 }
 
+export function createEnhancedUserPrompt(
+  params: GenerateActivitiesParams,
+  customSettings: {
+    customInstructions: string
+    focusAreas: string[]
+    avoidTopics: string[]
+    temperature: number
+    maxTokens: number
+  }
+): string {
+  // Start with the base prompt
+  let prompt = createUserPrompt(params)
+  
+  // Add custom instructions if provided
+  if (customSettings.customInstructions) {
+    prompt += `\n\nIMPORTANT CUSTOM INSTRUCTIONS:\n${customSettings.customInstructions}`
+  }
+  
+  // Add focus areas if specified
+  if (customSettings.focusAreas && customSettings.focusAreas.length > 0) {
+    prompt += `\n\nPREFERRED FOCUS AREAS:\nPlease prioritize activities related to: ${customSettings.focusAreas.join(', ')}`
+  }
+  
+  // Add topics to avoid if specified
+  if (customSettings.avoidTopics && customSettings.avoidTopics.length > 0) {
+    prompt += `\n\nTOPICS TO AVOID:\nDo NOT include activities related to: ${customSettings.avoidTopics.join(', ')}`
+  }
+  
+  return prompt
+}
+
 export async function generateActivities(params: GenerateActivitiesParams): Promise<Activity[]> {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY
   
   if (!apiKey) {
     throw new Error('OpenAI API key not configured. Please add VITE_OPENAI_API_KEY to your .env file.')
   }
+  
+  // Load custom AI settings from localStorage
+  const userId = params.children[0]?.user_id
+  let customSettings = {
+    temperature: 0.7,
+    maxTokens: 4000,
+    customInstructions: '',
+    focusAreas: [] as string[],
+    avoidTopics: [] as string[]
+  }
+  
+  if (userId) {
+    const savedSettings = localStorage.getItem(`ai_settings_${userId}`)
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      customSettings = {
+        temperature: parsed.temperature || 0.7,
+        maxTokens: parsed.maxTokens || 4000,
+        customInstructions: parsed.customInstructions || '',
+        focusAreas: parsed.focusAreas || [],
+        avoidTopics: parsed.avoidTopics || []
+      }
+    }
+  }
+  
+  // Create enhanced prompt with custom settings
+  const enhancedUserPrompt = createEnhancedUserPrompt(params, customSettings)
   
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -141,11 +199,11 @@ export async function generateActivities(params: GenerateActivitiesParams): Prom
           },
           {
             role: 'user',
-            content: createUserPrompt(params)
+            content: enhancedUserPrompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: customSettings.temperature,
+        max_tokens: customSettings.maxTokens,
         response_format: { type: "json_object" }
       })
     })

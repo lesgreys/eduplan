@@ -380,13 +380,34 @@ export default function Dashboard() {
   }
 
   // Update activity status
-  const updateActivityStatus = (id: string, status: 'completed' | 'skipped' | 'pending') => {
+  const updateActivityStatus = async (id: string, status: 'completed' | 'skipped' | 'pending') => {
+    // Find the activity to update
+    const activityToUpdate = activities.find(a => a.id === id)
+    if (!activityToUpdate) return
+    
+    // Update local state immediately for responsive UI
     const newActivities = activities.map(a => 
       a.id === id 
         ? { ...a, status, completedAt: status === 'completed' ? new Date().toISOString() : undefined }
         : a
     )
+    setActivities(newActivities)
     saveToHistory(newActivities)
+    
+    // Save to database
+    try {
+      if (user) {
+        await updateActivity(id, {
+          ...activityToUpdate,
+          status,
+          completedAt: status === 'completed' ? new Date().toISOString() : undefined
+        })
+      }
+    } catch (error) {
+      console.error('Error updating activity status:', error)
+      // Revert on error
+      setActivities(activities)
+    }
   }
 
   // Copy activity
@@ -488,6 +509,17 @@ export default function Dashboard() {
     }
     
     return filtered
+  })()
+
+  // Calculate completion stats for current view
+  const stats = (() => {
+    const total = filteredActivities.length
+    const completed = filteredActivities.filter(a => a.status === 'completed').length
+    const skipped = filteredActivities.filter(a => a.status === 'skipped').length
+    const pending = total - completed - skipped
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0
+    
+    return { total, completed, skipped, pending, completionRate }
   })()
 
   // Get child by ID
@@ -1117,6 +1149,108 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Progress Indicator */}
+        {stats.total > 0 && (
+          <div className="max-w-7xl mx-auto px-4 pt-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    {/* Completion Rate */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-12 h-12">
+                        <svg className="transform -rotate-90 w-12 h-12">
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="20"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                            className="text-muted"
+                          />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="20"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                            strokeDasharray={`${stats.completionRate * 1.26} 126`}
+                            className="text-primary transition-all duration-500"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-xs font-bold">{stats.completionRate}%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Progress</p>
+                        <p className="text-xs text-muted-foreground">
+                          {viewType === 'today' ? 'Today' : viewType === 'week' ? 'This Week' : 'This Month'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Stats */}
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="font-medium">{stats.completed}</span>
+                        <span className="text-muted-foreground">done</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">{stats.pending}</span>
+                        <span className="text-muted-foreground">pending</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <SkipForward className="w-4 h-4 text-orange-600" />
+                        <span className="font-medium">{stats.skipped}</span>
+                        <span className="text-muted-foreground">skipped</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Actions */}
+                  <div className="flex items-center gap-2">
+                    {stats.completed > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const message = `Great job! You completed ${stats.completed} ${stats.completed === 1 ? 'activity' : 'activities'} ${viewType === 'today' ? 'today' : viewType === 'week' ? 'this week' : 'this month'}!`
+                          alert(message) // Replace with proper toast notification
+                        }}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                        Celebrate
+                      </Button>
+                    )}
+                    {stats.pending > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Mark all as complete
+                          if (confirm(`Mark all ${stats.pending} pending activities as complete?`)) {
+                            filteredActivities
+                              .filter(a => !a.status || a.status === 'pending')
+                              .forEach(a => updateActivityStatus(a.id, 'completed'))
+                          }
+                        }}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Complete All
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Calendar Grid */}
         <div className="max-w-7xl mx-auto px-4 py-6">
           {/* Loading State */}
@@ -1521,6 +1655,54 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{child.emoji}</span>
                       <span className="font-medium">{child.name}</span>
+                    </div>
+
+                    {/* Status Controls */}
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <Label className="text-sm text-muted-foreground mb-2 block">Activity Status</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={selectedActivity.status === 'completed' ? 'default' : 'outline'}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            updateActivityStatus(selectedActivity.id, 'completed')
+                            setSelectedActivity({ ...selectedActivity, status: 'completed' })
+                          }}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                          Complete
+                        </Button>
+                        <Button
+                          variant={selectedActivity.status === 'skipped' ? 'default' : 'outline'}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            updateActivityStatus(selectedActivity.id, 'skipped')
+                            setSelectedActivity({ ...selectedActivity, status: 'skipped' })
+                          }}
+                        >
+                          <SkipForward className="w-3.5 h-3.5 mr-1.5" />
+                          Skip
+                        </Button>
+                        {selectedActivity.status && selectedActivity.status !== 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              updateActivityStatus(selectedActivity.id, 'pending')
+                              setSelectedActivity({ ...selectedActivity, status: 'pending' })
+                            }}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      {selectedActivity.completedAt && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Completed: {new Date(selectedActivity.completedAt).toLocaleString()}
+                        </p>
+                      )}
                     </div>
 
                     <div>

@@ -4,9 +4,11 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
-import { X, Sparkles, Loader2, ChevronRight, ChevronDown, Info, AlertCircle } from 'lucide-react'
+import { X, Sparkles, Loader2, ChevronRight, ChevronDown, Info, AlertCircle, Zap, Layers } from 'lucide-react'
 import { type Child, type Activity, subjects } from '@/lib/mockData'
 import { generateActivities, generateMockActivities, type GenerationPreferences as OpenAIPreferences } from '@/lib/openai'
+import { generateActivitiesMultiStep } from '@/lib/openai-multistep'
+import { generateActivityConceptsOnly, type ActivityConcept } from '@/lib/openai-concepts'
 
 interface GeneratePlanModalProps {
   isOpen: boolean
@@ -27,8 +29,12 @@ export default function GeneratePlanModal({
   existingActivities,
   onGenerate
 }: GeneratePlanModalProps) {
-  const [step, setStep] = useState<'preferences' | 'generating' | 'preview' | 'error'>('preferences')
+  const [step, setStep] = useState<'preferences' | 'generating' | 'concepts' | 'detailing' | 'preview' | 'error'>('preferences')
   const [error, setError] = useState<string | null>(null)
+  const [activityConcepts, setActivityConcepts] = useState<ActivityConcept[]>([])
+  const [selectedConcepts, setSelectedConcepts] = useState<Set<string>>(new Set())
+  const [editingConcept, setEditingConcept] = useState<string | null>(null)
+  const [generationProgress, setGenerationProgress] = useState({ step: '', progress: 0, message: '' })
   const [preferences, setPreferences] = useState<GenerationPreferences>({
     childIds: children.map(c => c.id),
     weekStart: currentWeek,
@@ -43,43 +49,66 @@ export default function GeneratePlanModal({
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set())
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const handleGenerate = async () => {
+  const handleGenerateConcepts = async () => {
     setStep('generating')
     setError(null)
     
     try {
-      let activities: Activity[]
+      // First, generate lightweight activity concepts
+      const concepts = await generateActivityConceptsOnly({
+        preferences,
+        children,
+        existingActivities
+      })
       
-      // Check if OpenAI API key is configured
-      const hasApiKey = !!import.meta.env.VITE_OPENAI_API_KEY
+      setActivityConcepts(concepts)
+      setSelectedConcepts(new Set(concepts.map(c => c.id)))
+      setStep('concepts')
+    } catch (err) {
+      console.error('Concept generation error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to generate activity concepts.')
+      setStep('error')
+    }
+  }
+  
+  const handleGenerateDetails = async () => {
+    setStep('detailing')
+    setError(null)
+    
+    try {
+      const selectedConceptsList = activityConcepts.filter(c => selectedConcepts.has(c.id))
       
-      if (hasApiKey) {
-        // Use real OpenAI API
-        activities = await generateActivities({
-          preferences,
-          children,
-          existingActivities
-        })
-      } else {
-        // Fallback to mock generation
-        console.log('No OpenAI API key found, using mock generation')
-        activities = await generateMockActivities({
-          preferences,
-          children,
-          existingActivities
-        })
-      }
+      // Convert concepts to the format expected by multi-step
+      const conceptsForGeneration = selectedConceptsList.map(concept => ({
+        id: concept.id,
+        childId: concept.childId,
+        childName: concept.childName,
+        title: concept.title,
+        subject: concept.subject,
+        day: concept.day,
+        startTime: concept.startTime,
+        endTime: concept.endTime,
+        ageAppropriate: concept.ageAppropriate,
+        conceptSummary: concept.conceptSummary || concept.description || ''
+      }))
       
-      if (activities.length === 0) {
-        throw new Error('No activities were generated. Please try adjusting your preferences.')
-      }
+      // Generate full details for selected concepts with progress tracking
+      const activities = await generateActivitiesMultiStep({
+        preferences,
+        children,
+        existingActivities,
+        concepts: conceptsForGeneration,
+        onProgress: (progress) => {
+          setGenerationProgress(progress)
+        }
+      })
       
       setGeneratedActivities(activities)
       setSelectedActivities(new Set(activities.map(a => a.id)))
       setStep('preview')
     } catch (err) {
-      console.error('Generation error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to generate activities. Please try again.')
+      console.error('Detail generation error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to generate activity details.')
       setStep('error')
     }
   }
@@ -268,11 +297,11 @@ export default function GeneratePlanModal({
                 Cancel
               </Button>
               <Button 
-                onClick={handleGenerate}
+                onClick={handleGenerateConcepts}
                 disabled={preferences.childIds.length === 0}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                Generate Plan
+                Generate Ideas
               </Button>
             </CardFooter>
           </>
@@ -281,10 +310,183 @@ export default function GeneratePlanModal({
         {step === 'generating' && (
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-            <h3 className="text-lg font-medium mb-2">Generating Your Plan</h3>
+            <h3 className="text-lg font-medium mb-2">Generating Activity Ideas</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              Creating personalized activities based on your children's profiles and preferences...
+              Creating personalized activity concepts for your children...
             </p>
+          </CardContent>
+        )}
+        
+        {step === 'concepts' && (
+          <>
+            <CardContent className="overflow-y-auto">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-medium">Activity Concepts ({activityConcepts.length})</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Review and select which activities to develop
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedConcepts(new Set(activityConcepts.map(c => c.id)))}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedConcepts(new Set())}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  {activityConcepts.map(concept => {
+                    const child = children.find(c => c.id === concept.childId)
+                    const isEditing = editingConcept === concept.id
+                    
+                    return (
+                      <div
+                        key={concept.id}
+                        className={`border rounded-lg p-3 transition-colors ${
+                          selectedConcepts.has(concept.id) 
+                            ? 'bg-primary/5 border-primary' 
+                            : 'bg-background border-border'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={selectedConcepts.has(concept.id)}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedConcepts)
+                              if (checked) {
+                                newSelected.add(concept.id)
+                              } else {
+                                newSelected.delete(concept.id)
+                              }
+                              setSelectedConcepts(newSelected)
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={concept.title}
+                                  onChange={(e) => {
+                                    const updated = activityConcepts.map(c => 
+                                      c.id === concept.id ? { ...c, title: e.target.value } : c
+                                    )
+                                    setActivityConcepts(updated)
+                                  }}
+                                  className="w-full px-2 py-1 border rounded text-sm"
+                                  placeholder="Activity title"
+                                />
+                                <textarea
+                                  value={concept.conceptSummary}
+                                  onChange={(e) => {
+                                    const updated = activityConcepts.map(c => 
+                                      c.id === concept.id ? { ...c, conceptSummary: e.target.value } : c
+                                    )
+                                    setActivityConcepts(updated)
+                                  }}
+                                  className="w-full px-2 py-1 border rounded text-sm h-16"
+                                  placeholder="Concept description"
+                                />
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => setEditingConcept(null)}>
+                                    Save
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => setEditingConcept(null)}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium">{concept.title}</span>
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded">{concept.subject}</span>
+                                  {child && (
+                                    <span className="text-xs">
+                                      {child.emoji} {child.name}
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => setEditingConcept(concept.id)}
+                                    className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-1">
+                                  {concept.conceptSummary || concept.description}
+                                </p>
+                                <div className="flex gap-4 text-xs text-muted-foreground">
+                                  <span>{concept.day}</span>
+                                  <span>{concept.startTime} - {concept.endTime}</span>
+                                  {concept.ageAppropriate && (
+                                    <span className="text-green-600">✓ Age appropriate</span>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep('preferences')}>
+                Back
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleGenerateConcepts}>
+                  Regenerate Ideas
+                </Button>
+                <Button 
+                  onClick={handleGenerateDetails}
+                  disabled={selectedConcepts.size === 0}
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  Generate Full Details ({selectedConcepts.size})
+                </Button>
+              </div>
+            </CardFooter>
+          </>
+        )}
+        
+        {step === 'detailing' && (
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+            <h3 className="text-lg font-medium mb-2">Creating Detailed Activities</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+              {generationProgress.message || 'Generating comprehensive instructions and materials...'}
+            </p>
+            {generationProgress.progress > 0 && (
+              <div className="w-full max-w-xs">
+                <div className="bg-muted rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all duration-300"
+                    style={{ width: `${generationProgress.progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-center mt-2 text-muted-foreground">
+                  {generationProgress.progress}% complete
+                </p>
+              </div>
+            )}
           </CardContent>
         )}
         
@@ -309,7 +511,7 @@ export default function GeneratePlanModal({
               <Button variant="outline" onClick={() => setStep('preferences')}>
                 Back to Preferences
               </Button>
-              <Button onClick={handleGenerate}>
+              <Button onClick={handleGenerateConcepts}>
                 <Sparkles className="w-4 h-4 mr-2" />
                 Try Again
               </Button>
@@ -397,7 +599,10 @@ export default function GeneratePlanModal({
                 Back
               </Button>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handleGenerate()}>
+                <Button variant="outline" onClick={() => {
+                  setStep('concepts')
+                  handleGenerateConcepts()
+                }}>
                   Regenerate
                 </Button>
                 <Button 
