@@ -247,7 +247,18 @@ export async function generateActivities(params: GenerateActivitiesParams): Prom
     })
     
     // Transform and validate activities
-    return activities.map((activity: any, index: number) => {
+    return activities.map((activity: {
+      childId: string
+      title: string
+      subject: string
+      description: string
+      day: string
+      startTime: string
+      endTime: string
+      materials?: string[]
+      instructions?: string[]
+      objectives?: string[]
+    }, index: number) => {
       const dayOffset = dayToOffset[activity.day] ?? 0
       const activityDate = new Date(mondayOfWeek)
       activityDate.setDate(mondayOfWeek.getDate() + dayOffset)

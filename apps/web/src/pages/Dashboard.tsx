@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
   Plus, Calendar, Users, Sparkles, Clock, 
-  ChevronLeft, ChevronRight, Wand2, X, Printer, Save, FolderOpen, Trash2, GripVertical,
+  ChevronLeft, ChevronRight, X, Printer, Save, FolderOpen, Trash2, GripVertical,
   ChevronDown, CalendarDays, CalendarRange, RotateCcw, Check, SkipForward, Copy,
   Search, Undo2, Redo2, CheckCircle2, XCircle,
   AlertTriangle, Inbox, Keyboard, Settings, Globe2, LogOut
@@ -246,7 +246,7 @@ export default function Dashboard() {
   const [historyIndex, setHistoryIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
   const [checkingFirstLogin, setCheckingFirstLogin] = useState(true)

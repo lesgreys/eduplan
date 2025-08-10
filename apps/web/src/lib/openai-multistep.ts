@@ -41,7 +41,7 @@ export async function generateActivitiesMultiStep(
     throw new Error('OpenAI API key not configured')
   }
 
-  const { preferences, children, existingActivities, onProgress } = params
+  const { preferences, children, onProgress } = params
   
   // Load custom settings
   const userId = children[0]?.user_id
@@ -174,7 +174,12 @@ export async function generateActivitiesMultiStep(
 async function generateWeekOutline(
   preferences: GenerationPreferences,
   children: Child[],
-  customSettings: any,
+  customSettings: {
+    temperature: number
+    customInstructions: string
+    focusAreas: string[]
+    avoidTopics: string[]
+  },
   apiKey: string
 ): Promise<ActivityOutline[]> {
   const childrenInfo = preferences.childIds
@@ -242,14 +247,14 @@ Create a balanced, progressive week. Just the outline, no details yet.`
   
   try {
     content = JSON.parse(data.choices[0].message.content)
-  } catch (parseError) {
+  } catch {
     console.error('Failed to parse AI response:', data.choices[0].message.content)
     // Try to extract JSON from the response if it's wrapped in text
     const jsonMatch = data.choices[0].message.content.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       try {
         content = JSON.parse(jsonMatch[0])
-      } catch (e) {
+      } catch {
         throw new Error('Invalid JSON response from AI')
       }
     } else {
@@ -259,7 +264,7 @@ Create a balanced, progressive week. Just the outline, no details yet.`
   
   // Fix any ID mapping issues
   const activities = content.activities || content.outline || content || []
-  return activities.map((item: any) => ({
+  return activities.map((item: ActivityOutline) => ({
     ...item,
     childId: validateAndFixChildId(item.childId, item.childName, children)
   }))
@@ -272,7 +277,12 @@ Create a balanced, progressive week. Just the outline, no details yet.`
 async function generateActivityDetails(
   outline: ActivityOutline,
   child: Child,
-  customSettings: any,
+  customSettings: {
+    temperature: number
+    customInstructions: string
+    focusAreas: string[]
+    avoidTopics: string[]
+  },
   apiKey: string
 ): Promise<Activity> {
   const prompt = `Create detailed instructions for this activity:
@@ -326,7 +336,7 @@ Return JSON:
   
   try {
     details = JSON.parse(data.choices[0].message.content)
-  } catch (parseError) {
+  } catch {
     console.error('Failed to parse details:', data.choices[0].message.content)
     // Provide fallback details
     details = {
@@ -358,7 +368,6 @@ Return JSON:
     subject: outline.subject,
     description: details.description,
     day: outline.day,
-    date: activityDate.toISOString().split('T')[0],
     startTime: outline.startTime,
     endTime: outline.endTime,
     materials: [], // Will be added in step 3
@@ -375,7 +384,12 @@ Return JSON:
 async function enrichActivities(
   activities: Activity[],
   children: Child[],
-  customSettings: any,
+  _customSettings: {
+    temperature: number
+    customInstructions: string
+    focusAreas: string[]
+    avoidTopics: string[]
+  },
   apiKey: string
 ): Promise<Activity[]> {
   const activitiesSummary = activities.map(a => ({
@@ -439,7 +453,7 @@ Return JSON:
  */
 async function optimizeWeekCohesion(
   activities: Activity[],
-  preferences: GenerationPreferences,
+  _preferences: GenerationPreferences,
   apiKey: string
 ): Promise<Activity[]> {
   // Group activities by child and day
@@ -512,7 +526,7 @@ Return JSON:
       }
       return activity
     })
-  } catch (e) {
+  } catch {
     // If parsing fails, return as-is
     return activities
   }

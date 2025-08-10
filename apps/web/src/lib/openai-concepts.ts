@@ -134,7 +134,7 @@ Be creative! These are prompts the parent will review and can edit before genera
     const concepts = content.concepts || []
     
     // Validate and fix child IDs
-    return concepts.map((concept: any) => ({
+    return concepts.map((concept: ActivityConcept) => ({
       ...concept,
       id: `concept-${Date.now()}-${Math.random()}`,
       childId: validateChildId(concept.childId, concept.childName, children)
@@ -173,7 +173,7 @@ export function generateMockConcepts(
     const child = children.find(c => c.id === childId)
     if (!child) return
     
-    days.forEach((day, dayIndex) => {
+    days.forEach((day) => {
       const activitiesForDay = Math.min(
         preferences.maxActivitiesPerDay,
         Math.floor(Math.random() * 2) + 2

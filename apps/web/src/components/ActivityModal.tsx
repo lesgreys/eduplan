@@ -115,13 +115,6 @@ export default function ActivityModal({
     const targetDate = new Date(mondayOfWeek)
     targetDate.setDate(mondayOfWeek.getDate() + daysFromMonday)
     
-    // Format as YYYY-MM-DD in local timezone
-    const year = targetDate.getFullYear()
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0')
-    const dayNum = String(targetDate.getDate()).padStart(2, '0')
-    const dateString = `${year}-${month}-${dayNum}`
-    
-    
     const activityToSave: Activity = {
       id: activity?.id || Date.now().toString(),
       childId: formData.childId || '',
@@ -129,7 +122,6 @@ export default function ActivityModal({
       subject: formData.subject || subjects[0],
       description: formData.description || '',
       day: formData.day || day,
-      date: dateString, // Use the manually formatted date string
       startTime: formData.startTime || time,
       endTime: formData.endTime || getEndTime(time),
       materials: formData.materials || [],

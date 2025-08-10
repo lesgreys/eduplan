@@ -8,6 +8,8 @@ export interface Child {
   notes: string
   color: string
   emoji: string
+  user_id?: string
+  interests?: string[]
 }
 
 export interface Activity {
@@ -17,6 +19,7 @@ export interface Activity {
   subject: string
   description: string
   day: string
+  date?: string  // ISO date string (YYYY-MM-DD)
   startTime: string
   endTime: string
   materials?: string[]

@@ -95,7 +95,7 @@ export default function Settings() {
         
         // Load children
         const userChildren = await getChildren(user.id)
-        setChildren(userChildren as any)
+        setChildren(userChildren as Child[])
         
         // Load AI settings from localStorage
         const savedAISettings = localStorage.getItem(`ai_settings_${user.id}`)
@@ -1039,7 +1039,14 @@ export default function Settings() {
 
 // Helper function to generate a sample prompt for preview
 function generateSamplePrompt(
-  aiSettings: any,
+  aiSettings: {
+    systemPrompt: string
+    temperature: number
+    maxTokens: number
+    focusAreas: string[]
+    avoidTopics: string[]
+    customInstructions: string
+  },
   children: Child[]
 ): string {
   const systemPrompt = `You are an expert homeschool curriculum planner and educational consultant. Your task is to generate personalized, age-appropriate educational activities for homeschooled children.
@@ -1100,8 +1107,15 @@ Additional guidelines:
 
 // Helper function to test prompt generation
 async function testPromptGeneration(
-  aiSettings: any,
-  children: Child[]
+  aiSettings: {
+    systemPrompt: string
+    temperature: number
+    maxTokens: number
+    focusAreas: string[]
+    avoidTopics: string[]
+    customInstructions: string
+  },
+  _children: Child[]
 ): Promise<string> {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY
   

@@ -4,9 +4,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
-import { X, Sparkles, Loader2, ChevronRight, ChevronDown, Info, AlertCircle, Zap, Layers } from 'lucide-react'
+import { X, Sparkles, Loader2, ChevronRight, ChevronDown, Info, AlertCircle, Layers } from 'lucide-react'
 import { type Child, type Activity, subjects } from '@/lib/mockData'
-import { generateActivities, generateMockActivities, type GenerationPreferences as OpenAIPreferences } from '@/lib/openai'
+import { type GenerationPreferences as OpenAIPreferences } from '@/lib/openai'
 import { generateActivitiesMultiStep } from '@/lib/openai-multistep'
 import { generateActivityConceptsOnly, type ActivityConcept } from '@/lib/openai-concepts'
 
