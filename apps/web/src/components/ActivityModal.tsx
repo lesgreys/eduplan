@@ -70,7 +70,7 @@ export default function ActivityModal({
     if (formData.startTime && !activity) {
       setFormData(prev => ({
         ...prev,
-        endTime: getEndTime(prev.startTime)
+        endTime: getEndTime(prev.startTime || '09:00')
       }))
     }
   }, [formData.startTime, activity])

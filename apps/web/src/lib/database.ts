@@ -19,14 +19,32 @@ export async function getChildren(userId: string) {
 }
 
 export async function createChild(child: Omit<Child, 'id' | 'created_at' | 'updated_at'>) {
+  // Convert camelCase to snake_case for database columns
+  const dbChild: any = {
+    user_id: child.user_id,
+    name: child.name,
+    age: child.age,
+    grade: child.grade,
+    goals: child.goals,
+    curriculum_types: child.curriculumTypes,  // Convert camelCase to snake_case
+    notes: child.notes,
+    color: child.color,
+    emoji: child.emoji
+  }
+  
   const { data, error } = await supabase
     .from('children')
-    .insert([child])
+    .insert([dbChild])
     .select()
     .single()
   
   if (error) throw error
-  return data as Child
+  
+  // Map database columns back to TypeScript interface
+  return {
+    ...data,
+    curriculumTypes: data.curriculum_types || []
+  } as Child
 }
 
 export async function updateChild(id: string, updates: Partial<Child>) {
