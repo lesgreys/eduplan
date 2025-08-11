@@ -339,6 +339,30 @@ export default function Dashboard() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Check if any modal is open - if so, don't process shortcuts (except Escape)
+      const isModalOpen = modalOpen || showGeneratePlan || showKeyboardShortcuts || 
+                         showLoadMenu || showViewMenu || selectedActivity !== null
+      
+      // Check if user is typing in an input field
+      const isTypingInInput = document.activeElement?.tagName === 'INPUT' || 
+                            document.activeElement?.tagName === 'TEXTAREA' ||
+                            document.activeElement?.getAttribute('contenteditable') === 'true'
+      
+      // Always allow Escape key to close modals
+      if (e.key === 'Escape') {
+        setShowKeyboardShortcuts(false)
+        setShowSearch(false)
+        setShowLoadMenu(false)
+        setShowViewMenu(false)
+        setSelectedActivity(null)
+        return
+      }
+      
+      // Don't process other shortcuts if a modal is open or user is typing
+      if (isModalOpen || isTypingInInput) {
+        return
+      }
+      
       const metaKey = e.metaKey || e.ctrlKey
       
       if (metaKey) {
@@ -378,7 +402,7 @@ export default function Dashboard() {
       }
       
       // View shortcuts (no modifier key needed)
-      if (!e.metaKey && !e.ctrlKey && !e.altKey && document.activeElement?.tagName !== 'INPUT') {
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         switch(e.key.toLowerCase()) {
           case 'd':
             setViewType('today')
@@ -389,17 +413,13 @@ export default function Dashboard() {
           case 'm':
             setViewType('month')
             break
-          case 'escape':
-            setShowKeyboardShortcuts(false)
-            setShowSearch(false)
-            break
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [showKeyboardShortcuts, historyIndex, history])
+  }, [showKeyboardShortcuts, modalOpen, showGeneratePlan, showLoadMenu, showViewMenu, selectedActivity, historyIndex, history])
 
   // Helper to save history for undo/redo and persist to database
   const saveToHistory = async (newActivities: Activity[]) => {
