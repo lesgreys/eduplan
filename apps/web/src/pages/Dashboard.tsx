@@ -74,9 +74,10 @@ function DraggableActivity({
       ref={setNodeRef}
       style={{
         ...style,
-        minHeight: slotSpan > 1 ? `${slotSpan * 32}px` : '40px'
+        minHeight: '32px',
+        maxHeight: '32px'
       }}
-      className={`rounded border ${getChildColor(child.color)} ${getStatusStyles()} flex items-center group text-xs relative ${slotSpan > 1 ? 'border-2' : ''}`}
+      className={`rounded border ${getChildColor(child.color)} ${getStatusStyles()} flex items-center group text-xs relative`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
@@ -222,9 +223,9 @@ function DroppableSlot({
       className={`relative border-r last:border-r-0 group ${
         isOver ? 'bg-primary/10' : isWeekend ? 'bg-muted/10' : 'hover:bg-muted/5'
       }`}
-      style={{ minHeight: '64px' }}
+      style={{ minHeight: '80px', height: '80px' }}
     >
-      <div className="p-1 h-full">
+      <div className="p-1 h-full overflow-y-auto">
         <div className="flex flex-col gap-1">
           {/* Render activities that start in this slot */}
           {startingActivities.map(activity => {
@@ -232,32 +233,33 @@ function DroppableSlot({
             const slotSpan = getActivitySlotSpan(activity)
             
             return child ? (
-              <div key={activity.id} className="min-h-[40px]">
-                <DraggableActivity 
-                  activity={activity} 
-                  child={child} 
-                  onClick={() => onActivityClick(activity)}
-                  onStatusChange={onStatusChange}
-                  onCopy={onCopy}
-                  showDuration={slotSpan > 1}
-                  slotSpan={slotSpan}
-                />
-              </div>
+              <DraggableActivity 
+                key={activity.id}
+                activity={activity} 
+                child={child} 
+                onClick={() => onActivityClick(activity)}
+                onStatusChange={onStatusChange}
+                onCopy={onCopy}
+                showDuration={slotSpan > 1}
+                slotSpan={1}
+              />
             ) : null
           })}
           
-          {/* Always show add button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onEmptyClick()
-            }}
-            className={`w-full py-2 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
-              startingActivities.length === 0 ? 'min-h-[40px]' : 'opacity-0 group-hover:opacity-100'
-            }`}
-          >
-            <Plus className="w-3 h-3 text-muted-foreground" />
-          </button>
+          {/* Always show add button if there's space */}
+          {startingActivities.length < 2 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEmptyClick()
+              }}
+              className={`w-full py-1.5 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
+                startingActivities.length === 0 ? 'min-h-[32px]' : ''
+              }`}
+            >
+              <Plus className="w-3 h-3 text-muted-foreground" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -678,8 +680,24 @@ export default function Dashboard() {
       const hasConflict = existingActivities.some(a => a.childId === draggedActivity.childId)
       
       if (!hasConflict) {
-        // Update activity position
-        const updatedActivity = { ...draggedActivity, day: newDay, startTime: newTime }
+        // Calculate the duration to maintain it when moving
+        const duration = draggedActivity.endTime ? 
+          timeToMinutes(draggedActivity.endTime) - timeToMinutes(draggedActivity.startTime) : 30
+        
+        // Calculate new end time based on new start time and original duration
+        const newStartMinutes = timeToMinutes(newTime)
+        const newEndMinutes = newStartMinutes + duration
+        const newEndHours = Math.floor(newEndMinutes / 60)
+        const newEndMins = newEndMinutes % 60
+        const newEndTime = `${String(newEndHours).padStart(2, '0')}:${String(newEndMins).padStart(2, '0')}`
+        
+        // Update activity position with both start and end times
+        const updatedActivity = { 
+          ...draggedActivity, 
+          day: newDay, 
+          startTime: newTime,
+          endTime: newEndTime
+        }
         
         // Optimistically update local state immediately for snappy UI
         setActivities(activities.map(a => 
@@ -689,10 +707,11 @@ export default function Dashboard() {
         // Then update in database if user is logged in
         if (user) {
           try {
-            // Only send the changed fields to update
+            // Send all time-related fields to update
             await updateActivity(draggedActivity.id, { 
               day: newDay, 
-              startTime: newTime 
+              startTime: newTime,
+              endTime: updatedActivity.endTime
             })
           } catch (error) {
             console.error('Error updating activity position:', error)
@@ -1420,22 +1439,12 @@ export default function Dashboard() {
 
                   {/* Time slots */}
                   {timeSlots.map(time => {
-                    // Calculate max activities for this time slot across all days
-                    const maxActivities = Math.max(
-                      ...weekDays.map(day => {
-                        const slotActivities = getActivitiesForSlot(day, time)
-                        return slotActivities.filter(a => a.startTime === time).length
-                      }),
-                      1
-                    )
-                    const rowHeight = maxActivities > 1 ? Math.max(64, maxActivities * 48) : 64
-                    
                     return (
                       <div key={time} className="grid border-b last:border-b-0" style={{ gridTemplateColumns: '80px repeat(7, minmax(0, 1fr))' }}>
                         {/* Time label */}
                         <div 
                           className="flex items-center justify-center text-xs text-muted-foreground border-r bg-muted/10 sticky left-0 bg-background/95"
-                          style={{ minHeight: `${rowHeight}px` }}
+                          style={{ minHeight: '80px' }}
                         >
                           {time}
                         </div>
