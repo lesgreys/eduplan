@@ -223,12 +223,12 @@ function DroppableSlot({
       className={`relative border-r last:border-r-0 group ${
         isOver ? 'bg-primary/10' : isWeekend ? 'bg-muted/10' : 'hover:bg-muted/5'
       }`}
-      style={{ minHeight: '80px', height: '80px' }}
+      style={{ minHeight: '80px' }}
     >
-      <div className="p-1 h-full overflow-y-auto">
+      <div className="p-1">
         <div className="flex flex-col gap-1">
-          {/* Render activities that start in this slot */}
-          {startingActivities.map(activity => {
+          {/* Render activities that start in this slot - show max 2 */}
+          {startingActivities.slice(0, 2).map(activity => {
             const child = getChild(activity.childId)
             const slotSpan = getActivitySlotSpan(activity)
             
@@ -246,20 +246,25 @@ function DroppableSlot({
             ) : null
           })}
           
-          {/* Always show add button if there's space */}
-          {startingActivities.length < 2 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onEmptyClick()
-              }}
-              className={`w-full py-1.5 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
-                startingActivities.length === 0 ? 'min-h-[32px]' : ''
-              }`}
-            >
-              <Plus className="w-3 h-3 text-muted-foreground" />
-            </button>
+          {/* Show overflow indicator if more than 2 activities */}
+          {startingActivities.length > 2 && (
+            <div className="text-xs text-center py-1 text-muted-foreground bg-muted/50 rounded">
+              +{startingActivities.length - 2} more
+            </div>
           )}
+          
+          {/* Always show add button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onEmptyClick()
+            }}
+            className={`w-full py-1.5 border border-dashed border-muted-foreground/20 rounded text-xs hover:border-muted-foreground/40 hover:bg-muted/5 transition-all flex items-center justify-center ${
+              startingActivities.length === 0 ? 'min-h-[32px]' : startingActivities.length > 2 ? 'opacity-0 group-hover:opacity-100' : ''
+            }`}
+          >
+            <Plus className="w-3 h-3 text-muted-foreground" />
+          </button>
         </div>
       </div>
     </div>
